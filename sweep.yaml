@@ -1,0 +1,20 @@
+name: big_sweep
+project: sweeps-example
+entity: charlesfrye
+program: run.py
+method: random
+parameters:
+    lr:
+        distribution: q_log_uniform
+        min: -8.
+        max: 0.
+        q: 0.0001
+    batch_size:
+        values: [1, 2, 4, 8, 16, 32, 64, 128, 256]
+    n_epochs:
+        value: 1
+    num_hidden:
+        min: 16
+        max: 128
+    activation:
+        values: ["none", "gelu", "lrelu", "prelu", "selu", "sigmoid", "softplus", "tanh"]
