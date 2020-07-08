@@ -1,0 +1,13 @@
+name: finer_sweep
+project: mnist-sweeps
+entity: charlesfrye
+program: run.py
+method: random
+parameters:
+    batch_size:
+        values: [1, 2, 4, 8, 16, 32, 64, 128, 256]
+    num_hidden:
+        min: 16
+        max: 128
+    activation:
+        values: ["none", "gelu", "lrelu", "prelu", "selu", "sigmoid", "softplus", "tanh"]
