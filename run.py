@@ -24,6 +24,7 @@ def main(args):
     data = load_data()
     model = build_model(wandb.config)
 
+    wandb.config.update({"n_params": model.count_trainable_parameters()})
     if wandb.config["lr"] is None:
         scaled_lr = LEARNING_RATE_SCALING * math.sqrt(wandb.config["batch_size"])
         wandb.config.update({"lr": scaled_lr}, allow_val_change=True)
@@ -31,7 +32,8 @@ def main(args):
     optimizer = torch.optim.SGD(
         model.parameters(), lr=wandb.config["lr"])
 
-    train_model(data, model, optimizer)
+    if not wandb.config.dryrun:
+        train_model(data, model, optimizer)
 
 
 def build_model(config):
@@ -40,13 +42,13 @@ def build_model(config):
 
 
 def train_model(data, model, optimizer):
-    model.train()
     wandb.watch(model)
 
     start_time = time.time()
     step = 0
     for epoch in range(wandb.config["n_epochs"]):
 
+        model.train()
         val_iterator = iter(data.val)
         for inpt, target in data.train:
             optimizer.zero_grad()
@@ -79,6 +81,7 @@ def train_model(data, model, optimizer):
 
         running_loss, running_accuracy = 0, 0
         for inpt, target in data.val:
+            model.train(False)
             _, val_loss, val_accuracy = run_forward_metrics(inpt, target, model)
             running_loss += val_loss.item()
             running_accuracy += val_accuracy.item()
@@ -144,6 +147,10 @@ def load_data():
 
 def setup_wandb(args):
 
+    if args.num_hidden is not None:
+        if args.shape == "wide":
+            raise ValueError(f"num_hidden set, but shape=={args.shape}!=wide")
+
     wandb.init(entity="charlesfrye", project=args.project,
                config=args)
     return
@@ -165,9 +172,12 @@ def get_labeled_images(inputs, outputs, max_n=4):
 def build_parser():
     parser = argparse.ArgumentParser(
         description="Run an MLP experiment on MNIST")
+
     default_lr = None
     default_batch_size = 32
-    default_num_hidden = 32
+    default_budget = 32 * (MLP.input_dim + 1) + MLP.num_classes * (32 + 1)
+    default_shape = "wide"
+    default_num_hidden = None
     default_activation = "none"
     default_n_epochs = 20
     default_timeout = 15 * 60
@@ -190,14 +200,26 @@ def build_parser():
 
     # Network Parameters
     parser.add_argument("--num_hidden", type=int, default=default_num_hidden,
-                        help="Number of nodes in hidden layer." +
-                        f"Default is {default_num_hidden}.")
+                        help="Number of nodes in hidden layer if network is wide." +
+                        "Default is {default_num_hidden}.")
+    parser.add_argument("--budget", type=int, default=default_budget,
+                        dest="parameter_budget",
+                        help="Maximum number of parameters." +
+                        "If set, over-rides num_hidden value.")
+    parser.add_argument("--shape", type=str, default=default_shape,
+                        choices=["wide", "deep", "pyramidal"],
+                        help="Shape of network with set parameter budget." +
+                        "wide has one layer, deep has multiple equally-sized layers," +
+                        "and pyramidal has multiple layers of decreasing size." +
+                        f"Default is {default_shape}.")
     parser.add_argument("--activation", type=str, default=default_activation,
                         choices=MLP.activations,
                         help="Non-linear activation function for hidden layer. " +
                         f"Default is {default_activation}.")
 
     # Tracking Parameters
+    parser.add_argument("-n", "--dry-run", action="store_true", dest="dryrun",
+                        help="Flag to setup run without executing.")
     parser.add_argument("--project", type=str, default=default_project,
                         help="Project name on wandb. Default is None.")
     parser.add_argument("--track_images", action="store_true",

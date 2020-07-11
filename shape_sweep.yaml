@@ -1,0 +1,14 @@
+name: shape_sweep
+project: mnist-sweeps
+entity: charlesfrye
+program: run.py
+method: random
+parameters:
+    batch_size:
+        values: [8, 16, 32, 64, 128, 256]
+    parameter_budget:
+        values: [10000, 25000, 50000, 100000, 200000]
+    shape:
+        values: ["wide", "deep", "pyramidal"]
+    activation:
+        values: ["relu", "gelu", "sigmoid", "softplus", "tanh"]
